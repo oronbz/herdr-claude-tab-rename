@@ -13,21 +13,39 @@ script_path="${BASH_SOURCE[0]}"
 mkdir -p "$state_dir" 2>/dev/null || exit 0
 
 claude_panes() {
-  jq -r '(.result.panes // [.result.pane])[]? | select(.agent == "claude") | [.pane_id, .tab_id, (.terminal_title_stripped // "")] | @tsv' 2>/dev/null
+  jq -r '(.result.panes // [.result.pane])[]? | select(.agent == "claude" and (.terminal_title_stripped // "") != "") | [.pane_id, .tab_id, (.terminal_title_stripped // ""), (.agent_session.value // "")] | @tsv' 2>/dev/null
+}
+
+custom_title() {
+  local session="$1" transcript
+  [ -n "$session" ] || return 0
+  for transcript in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/projects/*/"$session".jsonl; do
+    [ -r "$transcript" ] || continue
+    grep -F '"type":"custom-title"' "$transcript" | tail -n 1 | jq -r '.customTitle // empty' 2>/dev/null
+    return 0
+  done
 }
 
 sync_pane() {
-  local pane_id="$1" tab_id="$2" title="$3" label pane_state tab_state
+  local pane_id="$1" tab_id="$2" title="$3" session="$4" label pane_state tab_state pending
   [ -n "$pane_id" ] && [ -n "$tab_id" ] && [ -n "$title" ] || return 0
   [ "$title" = "Claude Code" ] && return 0
   pane_state="$state_dir/pane_${pane_id//[^A-Za-z0-9_-]/_}"
   tab_state="$state_dir/tab_${tab_id//[^A-Za-z0-9_-]/_}"
+  pending="$state_dir/pending_${pane_id//[^A-Za-z0-9_-]/_}"
   [ -r "$pane_state" ] && [ "$(cat "$pane_state")" = "$title" ] && return 0
   label="$("$herdr_bin" tab get "$tab_id" 2>/dev/null | jq -r '.result.tab.label // empty' 2>/dev/null)" || return 0
-  if [[ ! "$label" =~ ^[0-9]+$ ]] && { [ ! -r "$tab_state" ] || [ "$(cat "$tab_state")" != "$label" ]; }; then
-    printf '%s' "$title" > "$pane_state"
+  if [[ ! "$label" =~ ^[0-9]+$ ]] && { [ ! -r "$tab_state" ] || [ "$(cat "$tab_state")" != "$label" ]; } \
+    && [ "$(custom_title "$session")" != "$title" ]; then
+    if [ -r "$pending" ] && [ "$(cat "$pending")" = "$title" ]; then
+      rm -f "$pending"
+      printf '%s' "$title" > "$pane_state"
+    else
+      printf '%s' "$title" > "$pending"
+    fi
     return 0
   fi
+  rm -f "$pending"
   if [ "$label" != "$title" ]; then
     "$herdr_bin" tab rename "$tab_id" "$title" >/dev/null 2>&1 || return 0
   fi
@@ -38,8 +56,8 @@ sync_pane() {
 sync_all() {
   local panes
   panes="$("$herdr_bin" pane list 2>/dev/null)" || return 1
-  while IFS=$'\t' read -r pane_id tab_id title; do
-    sync_pane "$pane_id" "$tab_id" "$title"
+  while IFS=$'\t' read -r pane_id tab_id title session; do
+    sync_pane "$pane_id" "$tab_id" "$title" "$session"
   done < <(claude_panes <<<"$panes")
 }
 
@@ -79,8 +97,8 @@ case "${1:-}" in
     event_pane="$(jq -r '.pane.pane_id // .pane_id // .data.pane.pane_id // .data.pane_id // empty' <<<"${event_json:-null}" 2>/dev/null)"
     event_pane="${event_pane:-${HERDR_PANE_ID:-}}"
     [ -n "$event_pane" ] || exit 0
-    while IFS=$'\t' read -r pane_id tab_id title; do
-      sync_pane "$pane_id" "$tab_id" "$title"
+    while IFS=$'\t' read -r pane_id tab_id title session; do
+      sync_pane "$pane_id" "$tab_id" "$title" "$session"
     done < <("$herdr_bin" pane get "$event_pane" 2>/dev/null | claude_panes)
     ;;
 esac
