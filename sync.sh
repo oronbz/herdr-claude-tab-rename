@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
+if ! command -v jq >/dev/null 2>&1; then
+  echo "claude-tab-rename: jq is required, please install it and restart herdr" >&2
+  exit 1
+fi
+
 herdr_bin="${HERDR_BIN_PATH:-herdr}"
 state_dir="${HERDR_PLUGIN_STATE_DIR:-${TMPDIR:-/tmp}/claude-tab-rename}"
 pid_file="$state_dir/watch.pid"

@@ -17,7 +17,7 @@ Claude Code needs no hooks for this.
 ## Requirements
 
 - herdr >= 0.8.0 (macOS or Linux)
-- bash, jq
+- bash, jq (already included in recent macOS versions)
 
 ## Install
 
