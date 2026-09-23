@@ -23,13 +23,15 @@ Claude Code needs no hooks for this.
 
     herdr plugin install oronbz/herdr-claude-tab-rename --yes
 
+To update, run the same install command again, then `herdr plugin action invoke claude-tab-rename.sync-all` so the new version's watcher takes over.
+
 Or, from a local checkout:
 
     herdr plugin link .
 
 ## Usage
 
-Nothing to do; it starts with herdr. To resync every tab (this also restarts the watcher if it isn't running):
+Nothing to do; it starts with herdr. To resync every tab and restart the watcher:
 
     herdr plugin action invoke claude-tab-rename.sync-all
 
