@@ -16,14 +16,23 @@ claude_panes() {
   jq -r '(.result.panes // [.result.pane])[]? | select(.agent == "claude" and (.terminal_title_stripped // "") != "") | [.pane_id, .tab_id, (.terminal_title_stripped // ""), (.agent_session.value // "")] | @tsv' 2>/dev/null
 }
 
-custom_title() {
-  local session="$1" transcript
-  [ -n "$session" ] || return 0
-  for transcript in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/projects/*/"$session".jsonl; do
-    [ -r "$transcript" ] || continue
-    grep -F '"type":"custom-title"' "$transcript" | tail -n 1 | jq -r '.customTitle // empty' 2>/dev/null
-    return 0
-  done
+last_custom_title() {
+  grep -F '"type":"custom-title"' "$1" 2>/dev/null | tail -n 1 | jq -r '.customTitle // empty' 2>/dev/null
+}
+
+is_rename() {
+  local session="$1" title="$2" projects="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects" transcript
+  if [ -n "$session" ]; then
+    for transcript in "$projects"/*/"$session".jsonl; do
+      [ -r "$transcript" ] || continue
+      [ "$(last_custom_title "$transcript")" = "$title" ]
+      return
+    done
+  fi
+  while IFS= read -r transcript; do
+    [ "$(last_custom_title "$transcript")" = "$title" ] && return 0
+  done < <(find "$projects" -name '*.jsonl' -mmin -10 2>/dev/null)
+  return 1
 }
 
 sync_pane() {
@@ -36,7 +45,7 @@ sync_pane() {
   [ -r "$pane_state" ] && [ "$(cat "$pane_state")" = "$title" ] && return 0
   label="$("$herdr_bin" tab get "$tab_id" 2>/dev/null | jq -r '.result.tab.label // empty' 2>/dev/null)" || return 0
   if [[ ! "$label" =~ ^[0-9]+$ ]] && { [ ! -r "$tab_state" ] || [ "$(cat "$tab_state")" != "$label" ]; } \
-    && [ "$(custom_title "$session")" != "$title" ]; then
+    && ! is_rename "$session" "$title"; then
     if [ -r "$pending" ] && [ "$(cat "$pending")" = "$title" ]; then
       rm -f "$pending"
       printf '%s' "$title" > "$pane_state"
