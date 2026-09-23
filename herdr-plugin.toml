@@ -1,0 +1,24 @@
+id = "claude-tab-rename"
+name = "Claude Tab Rename"
+version = "0.1.0"
+min_herdr_version = "0.9.0"
+description = "Keep each tab named after the Claude Code session running in it."
+platforms = ["macos", "linux"]
+
+[[startup]]
+command = ["bash", "sync.sh", "--start"]
+
+[[events]]
+on = "pane.agent_detected"
+command = ["bash", "sync.sh"]
+
+[[events]]
+on = "pane.agent_status_changed"
+command = ["bash", "sync.sh"]
+
+[[actions]]
+id = "sync-all"
+title = "Sync tab names from Claude"
+description = "Rename every Claude Code tab to its session title and make sure the watcher is running."
+contexts = ["global"]
+command = ["bash", "sync.sh", "--start"]
