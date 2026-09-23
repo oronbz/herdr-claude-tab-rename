@@ -88,9 +88,15 @@ case "${1:-}" in
     ;;
   --start)
     sync_all
-    if ! watcher_running; then
-      nohup bash "$script_path" --watch </dev/null >/dev/null 2>&1 &
+    if watcher_running; then
+      old_pid="$(cat "$pid_file")"
+      kill "$old_pid" 2>/dev/null
+      for _ in 1 2 3 4 5 6 7 8 9 10; do
+        kill -0 "$old_pid" 2>/dev/null || break
+        sleep 0.2
+      done
     fi
+    nohup bash "$script_path" --watch </dev/null >/dev/null 2>&1 &
     ;;
   *)
     event_json="${HERDR_PLUGIN_EVENT_JSON:-}"
