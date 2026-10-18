@@ -13,7 +13,7 @@ script_path="${BASH_SOURCE[0]}"
 mkdir -p "$state_dir" 2>/dev/null || exit 0
 
 claude_panes() {
-  jq -r '(.result.panes // [.result.pane])[]? | select(.agent == "claude" and (.terminal_title_stripped // "") != "") | [.pane_id, .tab_id, (.terminal_title_stripped // ""), (.agent_session.value // "")] | @tsv' 2>/dev/null
+  jq -r 'reduce .result.panes[]? as $p ({}; if has($p.tab_id) then . else .[$p.tab_id] = $p end) | .[] | select(.agent == "claude" and (.terminal_title_stripped // "") != "") | [.pane_id, .tab_id, (.terminal_title_stripped // ""), (.agent_session.value // "")] | @tsv' 2>/dev/null
 }
 
 last_custom_title() {
@@ -113,8 +113,8 @@ case "${1:-}" in
     event_pane="${event_pane:-${HERDR_PANE_ID:-}}"
     [ -n "$event_pane" ] || exit 0
     while IFS=$'\t' read -r pane_id tab_id title session; do
-      sync_pane "$pane_id" "$tab_id" "$title" "$session"
-    done < <("$herdr_bin" pane get "$event_pane" 2>/dev/null | claude_panes)
+      [ "$pane_id" = "$event_pane" ] && sync_pane "$pane_id" "$tab_id" "$title" "$session"
+    done < <("$herdr_bin" pane list 2>/dev/null | claude_panes)
     ;;
 esac
 exit 0

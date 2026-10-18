@@ -10,7 +10,7 @@ Claude Code writes its session title (your `/rename` title, or its own auto titl
 
 Auto titles only rename tabs that still have their default number label or a name the plugin set itself, so a tab you named by hand keeps its name. A `/rename` always wins: the plugin checks the session transcript for Claude's `custom-title` record, and when the new title matches it, the tab is renamed even if you named it yourself. It finds the transcript by session ID when herdr knows it (with `herdr integration install claude`), otherwise it checks transcripts changed in the last 10 minutes. If you rename the tab by hand after that, your name stays until the next `/rename`.
 
-If a tab holds several Claude panes, the one whose title changed last wins.
+Only the first pane of a tab (top-left, as `herdr pane list` orders them) names it, so Claude sessions in other panes of that tab leave the tab name alone. If you close the first pane, the next one takes over.
 
 Claude Code needs no hooks for this.
 
